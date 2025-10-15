@@ -18,6 +18,9 @@ DEL_SELECT_DAY, DEL_SELECT_LESSON, DEL_CONFIRM = range(10, 13)
 async def delschedule_day(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    if query.data == 'back_to_main':
+        await query.edit_message_text('Удаление расписания отменено.')
+        return ConversationHandler.END
     day = query.data
     context.user_data['del_day'] = day
     lessons = models.get_schedule()
@@ -35,47 +38,149 @@ async def delschedule_day(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton(f"{num}. {lesson} ({time})", callback_data=str(num-1))] for num, lesson, time in lessons_for_day
     ]
-    keyboard.append([InlineKeyboardButton('Отмена', callback_data='cancel')])
+    keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_days')])
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text('Выберите урок для удаления:', reply_markup=reply_markup)
     context.user_data['lessons_for_day'] = lessons_for_day
     return DEL_SELECT_LESSON
 
+# async def delschedule_lesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
+#     query = update.callback_query
+#     await query.answer()
+#     if query.data == 'back_to_days':
+#         # Возвращаемся к выбору дня
+#         keyboard = [[InlineKeyboardButton(day, callback_data=day)] for day in WEEKDAYS]
+#         keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_main')])
+#         reply_markup = InlineKeyboardMarkup(keyboard)
+#         await query.edit_message_text('Выберите день недели для удаления:', reply_markup=reply_markup)
+#         return DEL_SELECT_DAY
+#     idx = int(query.data)   
+#     lessons = models.get_schedule()
+#     conn = models.sqlite3.connect(models.DB_PATH)
+#     cur = conn.cursor()
+#     day, lesson, time = lessons[idx]
+#     cur.execute('SELECT id FROM schedule WHERE day=? AND lesson=? AND time=?', (day, lesson, time))
+#     row = cur.fetchone()
+#     conn.close()
+#     if not row:
+#         await query.edit_message_text('Ошибка: не удалось найти урок для удаления.')
+#         return ConversationHandler.END
+#     schedule_id = row[0]
+#     context.user_data['del_schedule_id'] = schedule_id
+#     await query.edit_message_text(f'Удалить урок: {lesson} ({time})?\nДень: {day}', reply_markup=InlineKeyboardMarkup([
+#         [InlineKeyboardButton('Удалить', callback_data='yes')],
+#         [InlineKeyboardButton('🔙 Назад', callback_data='back_to_lessons')]
+#     ]))
+#     return DEL_CONFIRM
+
+# async def delschedule_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+#     query = update.callback_query
+#     await query.answer()
+#     if query.data == 'back_to_lessons':
+#         # Возвращаемся к выбору урока
+#         day = context.user_data['del_day']
+#         lessons = models.get_schedule()
+#         def get_lesson_num(time):
+#             for i, t in enumerate(LESSON_TIMES):
+#                 if t == time:
+#                     return i + 1
+#             return None
+#         lessons_for_day = [(get_lesson_num(time), lesson, time) for d, lesson, time in lessons if d == day]
+#         lessons_for_day = sorted([l for l in lessons_for_day if l[0] is not None], key=lambda x: x[0])
+#         keyboard = [
+#             [InlineKeyboardButton(f"{num}. {lesson} ({time})", callback_data=str(num-1))] for num, lesson, time in lessons_for_day
+#         ]
+#         keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_days')])
+#         reply_markup = InlineKeyboardMarkup(keyboard)
+#         await query.edit_message_text('Выберите урок для удаления:', reply_markup=reply_markup)
+#         return DEL_SELECT_LESSON
+#     if query.data == 'yes':
+#         schedule_id = context.user_data.get('del_schedule_id')
+#         models.delete_schedule(schedule_id)
+#         await query.edit_message_text('Урок удалён.')
+#     else:
+#         await query.edit_message_text('Удаление отменено.')
+#     return ConversationHandler.END
+
 async def delschedule_lesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    if query.data == 'cancel':
-        await query.edit_message_text('Удаление расписания отменено.')
-        return ConversationHandler.END
-    idx = int(query.data)
-    lessons = models.get_schedule()
-    conn = models.sqlite3.connect(models.DB_PATH)
-    cur = conn.cursor()
-    day, lesson, time = lessons[idx]
-    cur.execute('SELECT id FROM schedule WHERE day=? AND lesson=? AND time=?', (day, lesson, time))
-    row = cur.fetchone()
-    conn.close()
-    if not row:
+    
+    if query.data == 'back_to_days':
+        keyboard = [[InlineKeyboardButton(day, callback_data=day)] for day in WEEKDAYS]
+        keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_main')])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text('Выберите день недели для удаления:', reply_markup=reply_markup)
+        return DEL_SELECT_DAY
+
+    # Получаем информацию об уроке из lessons_for_day
+    lessons_for_day = context.user_data['lessons_for_day']
+    selected_lesson = next((lesson for num, lesson, time in lessons_for_day if str(num-1) == query.data), None)
+    selected_time = next((time for num, lesson, time in lessons_for_day if str(num-1) == query.data), None)
+    
+    if not selected_lesson or not selected_time:
         await query.edit_message_text('Ошибка: не удалось найти урок для удаления.')
         return ConversationHandler.END
-    schedule_id = row[0]
-    context.user_data['del_schedule_id'] = schedule_id
-    await query.edit_message_text(f'Удалить урок: {lesson} ({time})?\nДень: {day}', reply_markup=InlineKeyboardMarkup([
-        [InlineKeyboardButton('Удалить', callback_data='yes')],
-        [InlineKeyboardButton('Отмена', callback_data='cancel')]
-    ]))
+
+    day = context.user_data['del_day']
+    
+    # Сохраняем данные для удаления
+    context.user_data['del_lesson'] = selected_lesson
+    context.user_data['del_time'] = selected_time
+    
+    # Запрашиваем подтверждение
+    await query.edit_message_text(
+        f'Удалить урок: {selected_lesson} ({selected_time})?\nДень: {day}',
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton('Удалить', callback_data='yes')],
+            [InlineKeyboardButton('🔙 Назад', callback_data='back_to_lessons')]
+        ])
+    )
     return DEL_CONFIRM
 
 async def delschedule_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    if query.data == 'cancel':
-        await query.edit_message_text('Удаление расписания отменено.')
-        return ConversationHandler.END
+    
+    if query.data == 'back_to_lessons':
+        # Возврат к списку уроков
+        day = context.user_data['del_day']
+        lessons = models.get_schedule()
+        def get_lesson_num(time):
+            for i, t in enumerate(LESSON_TIMES):
+                if t == time:
+                    return i + 1
+            return None
+        lessons_for_day = [(get_lesson_num(time), lesson, time) for d, lesson, time in lessons if d == day]
+        lessons_for_day = sorted([l for l in lessons_for_day if l[0] is not None], key=lambda x: x[0])
+        keyboard = [
+            [InlineKeyboardButton(f"{num}. {lesson} ({time})", callback_data=str(num-1))] 
+            for num, lesson, time in lessons_for_day
+        ]
+        keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_days')])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text('Выберите урок для удаления:', reply_markup=reply_markup)
+        return DEL_SELECT_LESSON
+
     if query.data == 'yes':
-        schedule_id = context.user_data.get('del_schedule_id')
-        models.delete_schedule(schedule_id)
-        await query.edit_message_text('Урок удалён.')
+        day = context.user_data['del_day']
+        lesson = context.user_data['del_lesson']
+        time = context.user_data['del_time']
+        
+        # Получаем id урока по точным параметрам
+        conn = models.sqlite3.connect(models.DB_PATH)
+        cur = conn.cursor()
+        cur.execute('SELECT id FROM schedule WHERE day=? AND lesson=? AND time=?', 
+                   (day, lesson, time))
+        row = cur.fetchone()
+        conn.close()
+        
+        if row:
+            schedule_id = row[0]
+            models.delete_schedule(schedule_id)
+            await query.edit_message_text(f'Урок {lesson} ({time}) удалён.')
+        else:
+            await query.edit_message_text('Ошибка: урок не найден.')
     else:
         await query.edit_message_text('Удаление отменено.')
     return ConversationHandler.END
@@ -90,10 +195,22 @@ async def delschedule_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text('Только админ может удалять расписание.')
         return ConversationHandler.END
     keyboard = [[InlineKeyboardButton(day, callback_data=day)] for day in WEEKDAYS]
-    keyboard.append([InlineKeyboardButton('Отмена', callback_data='cancel')])
+    keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_main')])
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text('Выберите день недели для удаления:', reply_markup=reply_markup)
     return DEL_SELECT_DAY
+
+async def delschedule_start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in ADMIN_IDS:
+        await update.callback_query.edit_message_text('Только админ может удалять расписание.')
+        return
+    # Устанавливаем флаг для удаления урока
+    context.user_data['deleting_lesson'] = True
+    keyboard = [[InlineKeyboardButton(day, callback_data=day)] for day in WEEKDAYS]
+    keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_main')])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.edit_message_text('Выберите день недели для удаления:', reply_markup=reply_markup)
 
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -141,14 +258,14 @@ async def show_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lessons = [(get_lesson_num(time), lesson, time) for d, lesson, time in schedule if d == day_query]
         # Оставляем только заполненные номера
         lessons = sorted([l for l in lessons if l[0] is not None], key=lambda x: x[0])
-        # if lessons:
-        #     text = f'<b>{day_query}</b>\n'
-        #     for num, lesson, time in lessons:
-        #         text += f'{num}. {lesson} — <b>{time}</b>\n'
-        # else:
-        text = f'<b>{day_query}</b>\nНет уроков'
-        await update.message.reply_text(text, parse_mode='HTML')
-        return
+        if lessons:
+            text = f'<b>{day_query}</b>\n'
+            for num, lesson, time in lessons:
+                text += f'{num}. {lesson} — <b>{time}</b>\n'
+        else:
+            text = f'<b>{day_query}</b>\nНет уроков'
+            await update.message.reply_text(text, parse_mode='HTML')
+            return
     # Выводим расписание на всю неделю
     text = '<b>Расписание на неделю:</b>\n'
     for day in days:
@@ -164,7 +281,7 @@ async def show_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # Стадии диалога
-SELECT_DAY, SELECT_LESSON, INPUT_NAME = range(3)
+SELECT_DAY, SELECT_LESSON, INPUT_NAME, ADD_MORE = range(4)
 
 LESSON_TIMES = [
     "8:30-9:10", "9:20-10:00", "10:10-10:50", "11:10-11:50", "12:00-12:40", "12:50-13:30",
@@ -181,15 +298,30 @@ async def addschedule_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
     print(f"User {user_id} is admin. Showing days keyboard.")
     keyboard = [[InlineKeyboardButton(day, callback_data=day)] for day in WEEKDAYS]
-    keyboard.append([InlineKeyboardButton('Отмена', callback_data='cancel')])
+    keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_main')])
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text('Выберите день недели:', reply_markup=reply_markup)
     return SELECT_DAY
 
+async def addschedule_start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    print(f"addschedule_start_callback called by user {user_id}")
+    if user_id not in ADMIN_IDS:
+        await update.callback_query.edit_message_text('Только админ может добавлять расписание.')
+        print(f"User {user_id} is not admin. ADMIN_IDS: {ADMIN_IDS}")
+        return
+    print(f"User {user_id} is admin. Showing days keyboard.")
+    # Устанавливаем флаг для добавления урока
+    context.user_data['adding_lesson'] = True
+    keyboard = [[InlineKeyboardButton(day, callback_data=day)] for day in WEEKDAYS]
+    keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_main')])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.edit_message_text('Выберите день недели:', reply_markup=reply_markup)
+
 async def addschedule_day(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    if query.data == 'cancel':
+    if query.data == 'back_to_main':
         await query.edit_message_text('Добавление расписания отменено.')
         return ConversationHandler.END
     context.user_data['day'] = query.data
@@ -203,7 +335,7 @@ async def addschedule_day(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not keyboard:
         await query.edit_message_text('В этот день все слоты заняты.')
         return ConversationHandler.END
-    keyboard.append([InlineKeyboardButton('Отмена', callback_data='cancel')])
+    keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_days')])
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text('Выберите номер урока:', reply_markup=reply_markup)
     return SELECT_LESSON
@@ -211,9 +343,13 @@ async def addschedule_day(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def addschedule_lesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    if query.data == 'cancel':
-        await query.edit_message_text('Добавление расписания отменено.')
-        return ConversationHandler.END
+    if query.data == 'back_to_days':
+        # Возвращаемся к выбору дня
+        keyboard = [[InlineKeyboardButton(day, callback_data=day)] for day in WEEKDAYS]
+        keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_main')])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text('Выберите день недели:', reply_markup=reply_markup)
+        return SELECT_DAY
     lesson_idx = int(query.data)
     context.user_data['lesson_time'] = LESSON_TIMES[lesson_idx]
     context.user_data['lesson_num'] = lesson_idx + 1
@@ -224,7 +360,7 @@ async def addschedule_lesson(update: Update, context: ContextTypes.DEFAULT_TYPE)
         "Английский язык", "Физика", "Проект"
     ]
     keyboard = [[InlineKeyboardButton(subj, callback_data=subj)] for subj in SUBJECTS]
-    keyboard.append([InlineKeyboardButton('Отмена', callback_data='cancel')])
+    keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_lesson')])
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(f'Выберите название урока для {context.user_data["lesson_num"]} урока ({context.user_data["lesson_time"]}):', reply_markup=reply_markup)
     return INPUT_NAME
@@ -232,6 +368,22 @@ async def addschedule_lesson(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def addschedule_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Получаем название из callback_data, если это callback, иначе из текста
     if update.callback_query:
+        if update.callback_query.data == 'back_to_lesson':
+            # Возвращаемся к выбору времени
+            day = context.user_data['day']
+            lessons = models.get_schedule()
+            busy_times = set([time for d, l, time in lessons if d == day])
+            keyboard = []
+            for i, time in enumerate(LESSON_TIMES):
+                if time not in busy_times:
+                    keyboard.append([InlineKeyboardButton(f"{i+1} урок ({time})", callback_data=str(i))])
+            if not keyboard:
+                await update.callback_query.edit_message_text('В этот день все слоты заняты.')
+                return ConversationHandler.END
+            keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_days')])
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.callback_query.edit_message_text(f'Выберите номер урока для {day}:', reply_markup=reply_markup)
+            return SELECT_LESSON
         lesson_name = update.callback_query.data
     else:
         lesson_name = update.message.text.strip()
@@ -247,10 +399,50 @@ async def addschedule_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
     models.add_schedule(day, lesson_name, time)
     await update.effective_message.reply_text(f'Добавлено: {day} {lesson_name} {time}')
-    # Удалить кнопки
-    if update.callback_query:
-        await update.callback_query.edit_message_reply_markup(reply_markup=None)
-    return ConversationHandler.END
+    
+    # Предлагаем добавить еще урок в тот же день
+    keyboard = [
+        [InlineKeyboardButton('➕ Добавить еще урок', callback_data='add_more')],
+        [InlineKeyboardButton('🔙 Назад к выбору дня', callback_data='back_to_days')],
+        [InlineKeyboardButton('✅ Завершить', callback_data='finish')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.effective_message.reply_text(
+        f'Урок добавлен в {day}!\n\nЧто хотите сделать дальше?',
+        reply_markup=reply_markup
+    )
+    return ADD_MORE
+
+async def addschedule_add_more(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == 'add_more':
+        # Возвращаемся к выбору времени для того же дня
+        day = context.user_data['day']
+        lessons = models.get_schedule()
+        busy_times = set([time for d, l, time in lessons if d == day])
+        keyboard = []
+        for i, time in enumerate(LESSON_TIMES):
+            if time not in busy_times:
+                keyboard.append([InlineKeyboardButton(f"{i+1} урок ({time})", callback_data=str(i))])
+        if not keyboard:
+            await query.edit_message_text('В этот день все слоты заняты.')
+            return ConversationHandler.END
+        keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_days')])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(f'Выберите номер урока для {day}:', reply_markup=reply_markup)
+        return SELECT_LESSON
+    elif query.data == 'back_to_days':
+        # Возвращаемся к выбору дня
+        keyboard = [[InlineKeyboardButton(day, callback_data=day)] for day in WEEKDAYS]
+        keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_main')])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text('Выберите день недели:', reply_markup=reply_markup)
+        return SELECT_DAY
+    elif query.data == 'finish':
+        await query.edit_message_text('Добавление расписания завершено!')
+        return ConversationHandler.END
 
 async def addschedule_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('Добавление расписания отменено.')
@@ -291,15 +483,27 @@ async def editschedule_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text('Только админ может редактировать расписание.')
         return ConversationHandler.END
     keyboard = [[InlineKeyboardButton(day, callback_data=day)] for day in WEEKDAYS]
-    keyboard.append([InlineKeyboardButton('Отмена', callback_data='cancel')])
+    keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_main')])
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text('Выберите день недели для редактирования:', reply_markup=reply_markup)
     return EDIT_SELECT_DAY
 
+async def editschedule_start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in ADMIN_IDS:
+        await update.callback_query.edit_message_text('Только админ может редактировать расписание.')
+        return
+    # Устанавливаем флаг для редактирования урока
+    context.user_data['editing_lesson'] = True
+    keyboard = [[InlineKeyboardButton(day, callback_data=day)] for day in WEEKDAYS]
+    keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_main')])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.edit_message_text('Выберите день недели для редактирования:', reply_markup=reply_markup)
+
 async def editschedule_day(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    if query.data == 'cancel':
+    if query.data == 'back_to_main':
         await query.edit_message_text('Редактирование расписания отменено.')
         return ConversationHandler.END
     day = query.data
@@ -319,7 +523,7 @@ async def editschedule_day(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton(f"{num}. {lesson} ({time})", callback_data=str(num-1))] for num, lesson, time in lessons_for_day
     ]
-    keyboard.append([InlineKeyboardButton('Отмена', callback_data='cancel')])
+    keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_days')])
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text('Выберите урок для редактирования:', reply_markup=reply_markup)
     context.user_data['lessons_for_day'] = lessons_for_day
@@ -328,38 +532,78 @@ async def editschedule_day(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def editschedule_lesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    if query.data == 'cancel':
-        await query.edit_message_text('Редактирование расписания отменено.')
-        return ConversationHandler.END
-    idx = int(query.data)
-    lessons = models.get_schedule()
-    conn = models.sqlite3.connect(models.DB_PATH)
-    cur = conn.cursor()
-    day, lesson, time = lessons[idx]
-    cur.execute('SELECT id FROM schedule WHERE day=? AND lesson=? AND time=?', (day, lesson, time))
-    row = cur.fetchone()
-    conn.close()
-    if not row:
+    
+    if query.data == 'back_to_days':
+        keyboard = [[InlineKeyboardButton(day, callback_data=day)] for day in WEEKDAYS]
+        keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_main')])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text('Выберите день недели для редактирования:', reply_markup=reply_markup)
+        return EDIT_SELECT_DAY
+
+    # Получаем информацию об уроке из lessons_for_day
+    lessons_for_day = context.user_data['lessons_for_day']
+    selected_lesson = next((lesson for num, lesson, time in lessons_for_day if str(num-1) == query.data), None)
+    selected_time = next((time for num, lesson, time in lessons_for_day if str(num-1) == query.data), None)
+    
+    if not selected_lesson or not selected_time:
         await query.edit_message_text('Ошибка: не удалось найти урок для редактирования.')
         return ConversationHandler.END
+
+    day = context.user_data['edit_day']
+    
+    # Получаем id урока для редактирования
+    conn = models.sqlite3.connect(models.DB_PATH)
+    cur = conn.cursor()
+    cur.execute('SELECT id FROM schedule WHERE day=? AND lesson=? AND time=?', 
+                (day, selected_lesson, selected_time))
+    row = cur.fetchone()
+    conn.close()
+    
+    if not row:
+        await query.edit_message_text('Ошибка: урок не найден.')
+        return ConversationHandler.END
+        
     schedule_id = row[0]
     context.user_data['edit_schedule_id'] = schedule_id
-    context.user_data['edit_lesson_time'] = time
-    # Список предметов
+    context.user_data['edit_lesson_time'] = selected_time
+
+    # Список предметов для выбора
     SUBJECTS = [
         "Биология", "Информатика", "Литература", "Алгебра", "РМГ", "Вероятность и статистика",
         "Обществознание", "История", "География", "Геометрия", "Физкультура", "ОБЗР",
         "Английский язык", "Физика", "Проект"
     ]
     keyboard = [[InlineKeyboardButton(subj, callback_data=subj)] for subj in SUBJECTS]
-    keyboard.append([InlineKeyboardButton('Отмена', callback_data='cancel')])
+    keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_lessons')])
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(f'Выберите новое название для урока ({time}):', reply_markup=reply_markup)
+    
+    await query.edit_message_text(
+        f'Текущий урок: {selected_lesson}\nВремя: {selected_time}\n\nВыберите новое название для урока:',
+        reply_markup=reply_markup
+    )
     return EDIT_INPUT_NAME
 
 async def editschedule_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Получаем название из callback_data, если это callback, иначе из текста
     if update.callback_query:
+        if update.callback_query.data == 'back_to_lessons':
+            # Возвращаемся к выбору урока
+            day = context.user_data['edit_day']
+            lessons = models.get_schedule()
+            def get_lesson_num(time):
+                for i, t in enumerate(LESSON_TIMES):
+                    if t == time:
+                        return i + 1
+                return None
+            lessons_for_day = [(get_lesson_num(time), lesson, time) for d, lesson, time in lessons if d == day]
+            lessons_for_day = sorted([l for l in lessons_for_day if l[0] is not None], key=lambda x: x[0])
+            keyboard = [
+                [InlineKeyboardButton(f"{num}. {lesson} ({time})", callback_data=str(num-1))] for num, lesson, time in lessons_for_day
+            ]
+            keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_days')])
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.callback_query.edit_message_text('Выберите урок для редактирования:', reply_markup=reply_markup)
+            return EDIT_SELECT_LESSON
         new_name = update.callback_query.data
     else:
         new_name = update.message.text.strip()
@@ -382,5 +626,10 @@ async def clear_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id not in ADMIN_IDS:
         await update.message.reply_text('Только админ может очищать расписание.')
         return
-    models.clear_db()  # очищает обе таблицы, если нужно только расписание — используйте отдельную функцию
+    # Очищаем только таблицу расписания
+    conn = models.sqlite3.connect(models.DB_PATH)
+    cur = conn.cursor()
+    cur.execute('DELETE FROM schedule')
+    conn.commit()
+    conn.close()
     await update.message.reply_text('Все расписание очищено.')
