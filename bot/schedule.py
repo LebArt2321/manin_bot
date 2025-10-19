@@ -4,6 +4,7 @@ from .models import models
 import os
 from dotenv import load_dotenv
 
+
 # Константы для расписания
 WEEKDAYS = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница"]
 LESSON_TIMES = [
@@ -44,63 +45,6 @@ async def delschedule_day(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['lessons_for_day'] = lessons_for_day
     return DEL_SELECT_LESSON
 
-# async def delschedule_lesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     query = update.callback_query
-#     await query.answer()
-#     if query.data == 'back_to_days':
-#         # Возвращаемся к выбору дня
-#         keyboard = [[InlineKeyboardButton(day, callback_data=day)] for day in WEEKDAYS]
-#         keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_main')])
-#         reply_markup = InlineKeyboardMarkup(keyboard)
-#         await query.edit_message_text('Выберите день недели для удаления:', reply_markup=reply_markup)
-#         return DEL_SELECT_DAY
-#     idx = int(query.data)   
-#     lessons = models.get_schedule()
-#     conn = models.sqlite3.connect(models.DB_PATH)
-#     cur = conn.cursor()
-#     day, lesson, time = lessons[idx]
-#     cur.execute('SELECT id FROM schedule WHERE day=? AND lesson=? AND time=?', (day, lesson, time))
-#     row = cur.fetchone()
-#     conn.close()
-#     if not row:
-#         await query.edit_message_text('Ошибка: не удалось найти урок для удаления.')
-#         return ConversationHandler.END
-#     schedule_id = row[0]
-#     context.user_data['del_schedule_id'] = schedule_id
-#     await query.edit_message_text(f'Удалить урок: {lesson} ({time})?\nДень: {day}', reply_markup=InlineKeyboardMarkup([
-#         [InlineKeyboardButton('Удалить', callback_data='yes')],
-#         [InlineKeyboardButton('🔙 Назад', callback_data='back_to_lessons')]
-#     ]))
-#     return DEL_CONFIRM
-
-# async def delschedule_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     query = update.callback_query
-#     await query.answer()
-#     if query.data == 'back_to_lessons':
-#         # Возвращаемся к выбору урока
-#         day = context.user_data['del_day']
-#         lessons = models.get_schedule()
-#         def get_lesson_num(time):
-#             for i, t in enumerate(LESSON_TIMES):
-#                 if t == time:
-#                     return i + 1
-#             return None
-#         lessons_for_day = [(get_lesson_num(time), lesson, time) for d, lesson, time in lessons if d == day]
-#         lessons_for_day = sorted([l for l in lessons_for_day if l[0] is not None], key=lambda x: x[0])
-#         keyboard = [
-#             [InlineKeyboardButton(f"{num}. {lesson} ({time})", callback_data=str(num-1))] for num, lesson, time in lessons_for_day
-#         ]
-#         keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_days')])
-#         reply_markup = InlineKeyboardMarkup(keyboard)
-#         await query.edit_message_text('Выберите урок для удаления:', reply_markup=reply_markup)
-#         return DEL_SELECT_LESSON
-#     if query.data == 'yes':
-#         schedule_id = context.user_data.get('del_schedule_id')
-#         models.delete_schedule(schedule_id)
-#         await query.edit_message_text('Урок удалён.')
-#     else:
-#         await query.edit_message_text('Удаление отменено.')
-#     return ConversationHandler.END
 
 async def delschedule_lesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -211,13 +155,6 @@ async def delschedule_start_callback(update: Update, context: ContextTypes.DEFAU
     keyboard.append([InlineKeyboardButton('🔙 Назад', callback_data='back_to_main')])
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.edit_message_text('Выберите день недели для удаления:', reply_markup=reply_markup)
-
-
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, ConversationHandler, CallbackQueryHandler, MessageHandler, CommandHandler, filters
-from .models import models
-import os
-from dotenv import load_dotenv
 
 
 load_dotenv()

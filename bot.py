@@ -9,7 +9,7 @@ from bot.schedule import addschedule_start, addschedule_day, addschedule_lesson,
 from bot.schedule import delschedule_start, delschedule_day, delschedule_lesson, delschedule_confirm, delschedule_cancel, delschedule_start_callback
 from bot.schedule import editschedule_start, editschedule_day, editschedule_lesson, editschedule_name, editschedule_cancel, editschedule_start_callback
 from bot.menu import get_main_menu, get_schedule_menu, get_days_menu, get_admin_menu, get_clear_confirm_menu, help_menu
-from telegram import ReplyKeyboardMarkup, KeyboardButton  # Добавьте этот импорт в начало файла
+from telegram import ReplyKeyboardMarkup, KeyboardButton
 
 
 logging.basicConfig(
@@ -65,61 +65,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=get_main_menu()
     )
 
-# Обработчики кнопок меню
-# async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     query = update.callback_query
-#     await query.answer()
-    
-#     try:
-#         if query.data == "menu_schedule":
-#             await query.edit_message_text(
-#                 "Выберите действие с расписанием:",
-#                 reply_markup=get_schedule_menu()
-#             )
-#         elif query.data == "show_schedule":
-#             # Получаем расписание и отправляем как новое сообщение
-#             from bot.models import models
-#             schedule = models.get_schedule()
-#             if not schedule:
-#                 await query.edit_message_text(
-#                     '📅 Расписание пусто.\n\nВыберите действие:',
-#                     reply_markup=get_schedule_menu()
-#                 )
-#                 return
-        
-#             days = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница']
-#             LESSON_TIMES = [
-#                 "8:30-9:10", "9:20-10:00", "10:10-10:50", "11:10-11:50", "12:00-12:40", "12:50-13:30",
-#                 "14:00-14:40", "14:50-15:30", "15:40-16:20", "16:30-17:10", "17:20-18:00", "18:10-18:50"
-#             ]
-            
-#             def get_lesson_num(time):
-#                 for i, t in enumerate(LESSON_TIMES):
-#                     if t == time:
-#                         return i + 1
-#                 return None
 
-#             text = '<b>Расписание на неделю:</b>\n'
-#             for day in days:
-#                 text += f'\n<b>{day}</b>\n'
-#                 lessons = [(get_lesson_num(time), lesson, time) for d, lesson, time in schedule if d == day]
-#                 lessons = sorted([l for l in lessons if l[0] is not None], key=lambda x: x[0])
-#                 if lessons:
-#                     for num, lesson, time in lessons:
-#                         text += f'{num}. {lesson} — <b>{time}</b>\n'
-#                 else:
-#                     text += 'Нет уроков\n'
-            
-#             await query.edit_message_text(
-#                 f"{text}\n\nВыберите действие:",
-#                 parse_mode='HTML',
-#                 reply_markup=get_schedule_menu()
-#             )
-#         elif query.data == "show_schedule_day":
-#             await query.edit_message_text(
-#                 "Выберите день недели:",
-#                 reply_markup=get_days_menu()
-#             )
 async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
