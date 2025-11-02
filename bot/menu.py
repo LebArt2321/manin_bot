@@ -10,24 +10,27 @@ def get_main_menu():
     """Возвращает главное меню с основными командами"""
     keyboard = [
         [InlineKeyboardButton("📅 Расписание", callback_data="menu_schedule")],
-        [InlineKeyboardButton("➕ Добавить урок", callback_data="menu_add_lesson")],
-        [InlineKeyboardButton("✏️ Редактировать урок", callback_data="menu_edit_lesson")],
-        [InlineKeyboardButton("🗑️ Удалить урок", callback_data="menu_delete_lesson")],
-        [InlineKeyboardButton("🧹 Очистить расписание", callback_data="menu_clear_schedule")],
-        # [InlineKeyboardButton("❓ Помощь", callback_data="menu_help")]
+        [InlineKeyboardButton("📝 Домашнее задание", callback_data="menu_homework")],
     ]
     return InlineKeyboardMarkup(keyboard)
 
-# def get_schedule_menu():
-#     """Возвращает меню для работы с расписанием"""
-#     keyboard = [
-#         [InlineKeyboardButton("📅 Показать расписание", callback_data="show_schedule")],
-#         [InlineKeyboardButton("📅 Показать по дню", callback_data="show_schedule_day")],
-#         [InlineKeyboardButton("🔙 Назад в главное меню", callback_data="back_to_main")]
-#     ]
-#     return InlineKeyboardMarkup(keyboard)
 def get_schedule_menu():
     keyboard = [
+    [InlineKeyboardButton('📅 Показать расписание', callback_data='show_schedule')],
+        [InlineKeyboardButton('➕ Добавить урок', callback_data='menu_add_lesson')],
+        [InlineKeyboardButton('✏️ Редактировать урок', callback_data='menu_edit_lesson')],
+        [InlineKeyboardButton('🗑️ Удалить урок', callback_data='menu_delete_lesson')],
+        [InlineKeyboardButton('🧹 Очистить расписание', callback_data='menu_clear_schedule')],
+        [InlineKeyboardButton('🔙 Назад в главное меню', callback_data='back_to_main')]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_homework_menu():
+    keyboard = [
+        [InlineKeyboardButton('📄 Показать домашку', callback_data='show_homework')],
+        [InlineKeyboardButton('➕ Добавить домашку', callback_data='menu_add_homework')],
+        [InlineKeyboardButton('✏️ Редактировать домашку', callback_data='menu_edit_homework')],
+        [InlineKeyboardButton('🗑️ Удалить домашку', callback_data='menu_delete_homework')],
         [InlineKeyboardButton('🔙 Назад в главное меню', callback_data='back_to_main')]
     ]
     return InlineKeyboardMarkup(keyboard)

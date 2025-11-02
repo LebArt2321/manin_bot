@@ -9,6 +9,12 @@ from bot.schedule import addschedule_start, addschedule_day, addschedule_lesson,
 from bot.schedule import delschedule_start, delschedule_day, delschedule_lesson, delschedule_confirm, delschedule_cancel, delschedule_start_callback
 from bot.schedule import editschedule_start, editschedule_day, editschedule_lesson, editschedule_name, editschedule_cancel, editschedule_start_callback
 from bot.menu import get_main_menu, get_schedule_menu, get_days_menu, get_admin_menu, get_clear_confirm_menu, help_menu
+from bot.menu import get_homework_menu
+from bot.homework import (
+    show_homework, addhomework_start, addhomework_subject, addhomework_input,
+    delhomework_start, delhomework_select, delhomework_confirm,
+    edithomework_start, edithomework_select, edithomework_input, cancel as hw_cancel
+)
 from telegram import ReplyKeyboardMarkup, KeyboardButton
 
 
@@ -27,6 +33,19 @@ async def handle_menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
             'Выберите действие:',
             reply_markup=get_main_menu()
         )
+
+
+async def handle_text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Route plain text messages to appropriate handlers based on user_data flags."""
+    # Homework add input
+    if hasattr(context, 'user_data') and context.user_data.get('expecting_homework_input'):
+        from bot.homework import addhomework_input
+        return await addhomework_input(update, context)
+    if hasattr(context, 'user_data') and context.user_data.get('expecting_homework_edit_input'):
+        from bot.homework import edithomework_input
+        return await edithomework_input(update, context)
+    # Fallback to existing menu button handler
+    return await handle_menu_button(update, context)
 
 # async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #     await update.message.reply_text(
@@ -72,7 +91,13 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     
     try:
         if query.data == "menu_schedule":
-            # Сразу показываем расписание
+            # Open schedule menu (user can choose to view, add, edit, delete)
+            await query.edit_message_text(
+                "Выберите действие с расписанием:",
+                reply_markup=get_schedule_menu()
+            )
+        elif query.data == 'show_schedule':
+            # show actual schedule content
             from bot.models import models
             schedule = models.get_schedule()
             if not schedule:
@@ -81,13 +106,12 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
                     reply_markup=get_schedule_menu()
                 )
                 return
-            
             days = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница']
             LESSON_TIMES = [
                 "8:30-9:10", "9:20-10:00", "10:10-10:50", "11:10-11:50", "12:00-12:40", "12:50-13:30",
                 "14:00-14:40", "14:50-15:30", "15:40-16:20", "16:30-17:10", "17:20-18:00", "18:10-18:50"
             ]
-            
+
             def get_lesson_num(time):
                 for i, t in enumerate(LESSON_TIMES):
                     if t == time:
@@ -104,7 +128,7 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
                         text += f'{num}. {lesson} — <b>{time}</b>\n'
                 else:
                     text += 'Нет уроков\n'
-            
+
             await query.edit_message_text(
                 text,
                 parse_mode='HTML',
@@ -194,6 +218,54 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
                 "Выберите действие с расписанием:",
                 reply_markup=get_schedule_menu()
             )
+        elif query.data == "menu_homework":
+            await query.edit_message_text(
+                "Выберите действие с домашними заданиями:",
+                reply_markup=get_homework_menu()
+            )
+        elif query.data == "show_homework":
+            # call show_homework callback-friendly
+            from bot.homework import show_homework_callback
+            await show_homework_callback(update, context)
+        elif query.data == "menu_add_homework":
+            # set flag and start add flow; clear other homework flags
+            context.user_data['adding_homework'] = True
+            context.user_data.pop('editing_homework', None)
+            context.user_data.pop('deleting_homework', None)
+            from bot.homework import addhomework_start_callback
+            await addhomework_start_callback(update, context)
+        elif query.data == "menu_delete_homework":
+            context.user_data['deleting_homework'] = True
+            context.user_data.pop('adding_homework', None)
+            context.user_data.pop('editing_homework', None)
+            from bot.homework import delhomework_start_callback
+            await delhomework_start_callback(update, context)
+        elif query.data == "menu_edit_homework":
+            context.user_data['editing_homework'] = True
+            context.user_data.pop('adding_homework', None)
+            context.user_data.pop('deleting_homework', None)
+            from bot.homework import edithomework_start_callback
+            await edithomework_start_callback(update, context)
+        # Homework-specific callback ids
+        elif query.data.startswith('hw_del_'):
+            if hasattr(context, 'user_data') and 'deleting_homework' in context.user_data:
+                from bot.homework import delhomework_select
+                await delhomework_select(update, context)
+        elif query.data.startswith('hw_edit_'):
+            if hasattr(context, 'user_data') and 'editing_homework' in context.user_data:
+                from bot.homework import edithomework_select
+                await edithomework_select(update, context)
+        elif query.data == 'cancel':
+            # route cancel to current homework flow if any
+            if hasattr(context, 'user_data') and 'adding_homework' in context.user_data:
+                from bot.homework import addhomework_subject
+                await addhomework_subject(update, context)
+            elif hasattr(context, 'user_data') and 'deleting_homework' in context.user_data:
+                from bot.homework import delhomework_select
+                await delhomework_select(update, context)
+            elif hasattr(context, 'user_data') and 'editing_homework' in context.user_data:
+                from bot.homework import edithomework_select
+                await edithomework_select(update, context)
         elif query.data.startswith("day_"):
             day = query.data.replace("day_", "")
             # Получаем расписание для конкретного дня
@@ -269,20 +341,42 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
                 )
         # Обработка выбора времени урока (цифры 0-11)
         elif query.data.isdigit() and 0 <= int(query.data) <= 11:
+            # numeric callbacks can be schedule lesson indices or homework selection indices
             if hasattr(context, 'user_data') and 'adding_lesson' in context.user_data:
                 await addschedule_lesson(update, context)
             elif hasattr(context, 'user_data') and 'deleting_lesson' in context.user_data:
                 await delschedule_lesson(update, context)
             elif hasattr(context, 'user_data') and 'editing_lesson' in context.user_data:
                 await editschedule_lesson(update, context)
+            elif hasattr(context, 'user_data') and 'deleting_homework' in context.user_data:
+                from bot.homework import delhomework_select
+                await delhomework_select(update, context)
+            elif hasattr(context, 'user_data') and 'editing_homework' in context.user_data:
+                from bot.homework import edithomework_select
+                await edithomework_select(update, context)
         # Обработка выбора предмета (названия предметов)
         elif query.data in ["Биология", "Информатика", "Литература", "Алгебра", "РМГ", "Вероятность и статистика",
                            "Обществознание", "История", "География", "Геометрия", "Физкультура", "ОБЗР",
                            "Английский язык", "Физика", "Проект"]:
+            # route to schedule or homework depending on context flags
             if hasattr(context, 'user_data') and 'adding_lesson' in context.user_data:
                 await addschedule_name(update, context)
             elif hasattr(context, 'user_data') and 'editing_lesson' in context.user_data:
                 await editschedule_name(update, context)
+            elif hasattr(context, 'user_data') and 'adding_homework' in context.user_data:
+                # handle subject click for homework
+                from bot.homework import addhomework_subject
+                await addhomework_subject(update, context)
+            elif hasattr(context, 'user_data') and 'editing_homework' in context.user_data:
+                # if we are in the stage of choosing subject for edit, route accordingly
+                from bot.homework import edithomework_choose_subject, edithomework_select
+                # if hw_chosen_subject flag present or we just opened edit list, choose appropriate handler
+                if context.user_data.get('hw_edit_id'):
+                    # user already selected which homework to edit and now picks subject
+                    await edithomework_choose_subject(update, context)
+                else:
+                    # otherwise, this click might be selecting which homework to edit (unlikely path)
+                    await edithomework_select(update, context)
         # Обработка специальных callback-ов
         elif query.data in ['add_more', 'back_to_days', 'finish', 'back_to_lesson', 'back_to_lessons', 'yes', 'back']:
             if hasattr(context, 'user_data') and 'adding_lesson' in context.user_data:
@@ -293,6 +387,10 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             elif hasattr(context, 'user_data') and 'deleting_lesson' in context.user_data:
                 if query.data in ['back_to_days', 'back_to_lessons', 'yes']:
                     await delschedule_confirm(update, context)
+            elif hasattr(context, 'user_data') and 'deleting_homework' in context.user_data:
+                if query.data in ['yes', 'cancel']:
+                    from bot.homework import delhomework_confirm
+                    await delhomework_confirm(update, context)
             elif hasattr(context, 'user_data') and 'editing_lesson' in context.user_data:
                 if query.data in ['back_to_lesson', 'back', 'back_to_days']:
                     # Возвращаемся к выбору дня
@@ -365,6 +463,40 @@ if __name__ == '__main__':
         fallbacks=[CommandHandler('cancel', editschedule_cancel)],
     )
     app.add_handler(editschedule_conv)
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu_button))
-    # ...existing homework handlers...
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_router))
+    # Homework conversation handlers
+    from bot.homework import HW_SELECT_SUBJECT, HW_INPUT_TASK, HW_SELECT_HW, HW_CONFIRM_DELETE, HW_EDIT_INPUT
+    # add homework
+    addhomework_conv = ConversationHandler(
+        entry_points=[CommandHandler('addhomework', addhomework_start)],
+        states={
+            HW_SELECT_SUBJECT: [CallbackQueryHandler(addhomework_subject)],
+            HW_INPUT_TASK: [MessageHandler(filters.TEXT & ~filters.COMMAND, addhomework_input)],
+        },
+        fallbacks=[CommandHandler('cancel', hw_cancel)]
+    )
+    app.add_handler(addhomework_conv)
+    # delete homework
+    delhomework_conv = ConversationHandler(
+        entry_points=[CommandHandler('delhomework', delhomework_start)],
+        states={
+            HW_SELECT_HW: [CallbackQueryHandler(delhomework_select)],
+            HW_CONFIRM_DELETE: [CallbackQueryHandler(delhomework_confirm)],
+        },
+        fallbacks=[CommandHandler('cancel', hw_cancel)]
+    )
+    app.add_handler(delhomework_conv)
+    # edit homework
+    edithomework_conv = ConversationHandler(
+        entry_points=[CommandHandler('edithomework', edithomework_start)],
+        states={
+            HW_SELECT_HW: [CallbackQueryHandler(edithomework_select)],
+            HW_EDIT_INPUT: [MessageHandler(filters.TEXT & ~filters.COMMAND, edithomework_input)]
+        },
+        fallbacks=[CommandHandler('cancel', hw_cancel)]
+    )
+    app.add_handler(edithomework_conv)
+
+    # simple show command
+    app.add_handler(CommandHandler('showhomework', show_homework))
     app.run_polling()

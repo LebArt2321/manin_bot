@@ -44,7 +44,8 @@ def add_homework(subject, task, due_date):
 def get_homework():
 	conn = sqlite3.connect(DB_PATH)
 	cur = conn.cursor()
-	cur.execute('SELECT subject, task, due_date FROM homework ORDER BY id')
+	# return id as first column to allow direct actions by id
+	cur.execute('SELECT id, subject, task, due_date FROM homework ORDER BY id')
 	rows = cur.fetchall()
 	conn.close()
 	return rows
